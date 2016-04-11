@@ -1,0 +1,14 @@
+# depslib dependency file v1.0
+1458077225 source:c:\users\3187829\olamundo\main.cpp
+	<windows.h>
+	<GL/gl.h>
+	<GL/glu.h>
+	<GL/glut.h>
+
+1460404673 source:c:\users\4276663\desktop\invader\main.cpp
+	<windows.h>
+	<math.h>
+	<GL/gl.h>
+	<GL/glu.h>
+	<GL/glut.h>
+
