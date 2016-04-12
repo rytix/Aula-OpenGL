@@ -4,24 +4,29 @@
 #include <GL/glu.h>
 #include <GL/glut.h>
 #include <list>
+#include <time.h>
+#include <cstdlib>
 
 using namespace std;
 // *** Definição da nave ***
 //Constantes
 const GLfloat H_NAVE = 30.0f;
 const GLfloat W_NAVE = 20.0f;
-const GLfloat X_STEP_NAVE = 5.0f;
+const GLfloat X_STEP_NAVE = 10.0f;
+const int TEMPO_RECARGA_NAVE = 20;
 //Variaveis
 struct Nave{
     GLfloat x;
     GLfloat y;
+    int tempo_recarga;
 };
 // *** Definição do tiro ***
-const GLfloat largura = 1.0f;
-const GLfloat altura = 10.0f;
+const GLfloat H_TIRO = 15.0f;
+const GLfloat W_TIRO = 5.0f;
 struct Tiro{
     GLfloat x;
     GLfloat y;
+    bool tiro_do_jogador;
 };
 // *** Definição do Alien ***
 //Constantes
@@ -31,6 +36,7 @@ const GLfloat ESPACAMENTO = 0.0f;
 const int FRAMES_ALIEN = 2;
 const int LINHAS_ALIEN = 8;
 const int COLUNAS_ALIEN = 11;
+const int TEMPO_RECARGA_ALIEN = 20;
 //Desenhos Aliens
 //Alien Normal
 GLfloat ALIEN_1_FRAME[FRAMES_ALIEN][LINHAS_ALIEN][COLUNAS_ALIEN] =
@@ -63,6 +69,7 @@ struct Alien{
     GLfloat y;
     GLfloat frame[FRAMES_ALIEN][LINHAS_ALIEN][COLUNAS_ALIEN];
     GLfloat rgb[FRAMES_ALIEN][3];
+    int tempo_recarga;
 };
 // *** FIM DE DEFINIÇÕES ***
 // *** OPENGL E CABEÇALHO ***
@@ -74,11 +81,13 @@ void copiar_matriz_frames(GLfloat origem[FRAMES_ALIEN][LINHAS_ALIEN][COLUNAS_ALI
 void copiar_matriz_rgb(GLfloat origem[FRAMES_ALIEN][3],GLfloat destino[FRAMES_ALIEN][3]);
 void desenhar_nave(Nave nave);
 void desenhar_alien(Alien alien);
+void desenhar_tiro(Tiro tiro);
+void atirar(int x, int y, bool jogador_atirando);
 // *** FIM DO OPENGL E CABEÇALHO ***
 //Variaveis do Jogo
 Nave nave;
-list<Alien> aliens;
-list<Tiro> tiros;
+list<Alien*> aliens;
+list<Tiro*> tiros;
 bool estado_reiniciar_jogo = true;
 //Funções do jogo
 void reiniciar_jogo(){
@@ -86,25 +95,78 @@ void reiniciar_jogo(){
         estado_reiniciar_jogo = false;
         nave.x = 100;
         nave.y = 20;
-        for(int i = 0; i < 5; i++){
-            Alien *alien;
-            alien = new Alien;
-            alien->x = i*60 + 60;
-            alien->y = 120;
-            copiar_matriz_frames(ALIEN_1_FRAME,alien->frame);
-            copiar_matriz_rgb(ALIEN_1_RGB,alien->rgb);
-            aliens.push_back(*alien);
+        nave.tempo_recarga = TEMPO_RECARGA_NAVE;
+        for(int i = 0; i < 3; i++){
+            for(int j = 0; j < 6; j++){
+                Alien *alien;
+                alien = new Alien;
+                alien->x = j*60 + 20;
+                alien->y = 60*i + 180;
+                copiar_matriz_frames(ALIEN_1_FRAME,alien->frame);
+                copiar_matriz_rgb(ALIEN_1_RGB,alien->rgb);
+                aliens.push_back(alien);
+            }
         }
     }
+}
+void acao_tiros(){
+    list<Tiro*>::iterator it = tiros.begin();
+    while(it != tiros.end()){
+        if((*it)->tiro_do_jogador){
+            (*it)->y += 10;
+        }else{
+            (*it)->y -= 10;
+        }
+        if((*it)->y > windowHeight || (*it)->y < 0){
+            Tiro *tiro = *it;
+            tiros.erase(it++);
+            delete tiro;
+        }else{
+            it++;
+        }
+    }
+}
+void acao_aliens(){
+    list<Alien*>::iterator it = aliens.begin();
+    while(it != aliens.end()){
+        if(rand() % 100 < 1){ // Chance de atirar
+            atirar((*it)->x+W_ALIEN/2 - W_TIRO/2, (*it)->y + H_ALIEN/2,false);
+        }
+        it++;
+    }
+
+}
+void testar_colisao(){
+
+}
+void atirar(int x, int y, bool jogador_atirando){
+    Tiro *tiro;
+    tiro = new Tiro;
+    tiro->x = x;
+    tiro->y = y;
+    tiro->tiro_do_jogador = jogador_atirando;
+    tiros.push_back(tiro);
 }
 //*** OpenGL ***
 //Desenhos
 void desenhar_tudo(){
     desenhar_nave(nave);
-    list<Alien>::iterator it = aliens.begin();
+    list<Alien*>::iterator it = aliens.begin();
     while(it != aliens.end()){
-        desenhar_alien(*it++);
+        desenhar_alien(**it++);
     }
+    list<Tiro*>::iterator it2 = tiros.begin();
+    while(it2 != tiros.end()){
+        desenhar_tiro(**it2++);
+    }
+}
+void desenhar_tiro(Tiro tiro){
+    glBegin(GL_POLYGON);
+    glVertex2f(tiro.x,tiro.y);
+    glVertex2f(tiro.x+W_TIRO,tiro.y);
+    glVertex2f(tiro.x+W_TIRO,tiro.y+H_TIRO);
+    glVertex2f(tiro.x,tiro.y+H_TIRO);
+    glEnd();
 }
 void desenhar_nave(Nave nave){
     glColor3f(0.5f, 0.0f, 1.0f);
@@ -134,22 +196,27 @@ void desenhar_alien(Alien alien){
 void Timer(int value) //"Main Loop"
 {
     reiniciar_jogo();
+    acao_aliens();
+    acao_tiros();
+    //testar_colisao();
     // Redesenha o quadrado com as novas coordenadas
     glutPostRedisplay();
     glutTimerFunc(33,Timer, 1);
 }
-//Função callback chamada para fazer o desenho
+
 void LerTeclado(unsigned char key, int x, int y){
     switch (key) {
         case 'D':
         case 'd':
-
+            nave.x += X_STEP_NAVE;
             break;
         case 'A':
         case 'a':
+            nave.x -= X_STEP_NAVE;
             break;
         case 'W':
         case 'w':
+            atirar(nave.x+W_NAVE/2-W_TIRO/2,nave.y+H_NAVE/2,true);
             break;
         default:
             break;
@@ -195,12 +262,12 @@ void AlteraTamanhoJanela(GLsizei w, GLsizei h)
 
     // Estabelece a janela de seleção (left, right, bottom, top)
     if (w <= h)  {
-        windowHeight = 250.0f*h/w;
-        windowWidth = 250.0f;
+        windowHeight = 350.0f*h/w;
+        windowWidth = 350.0f;
     }
     else  {
-        windowWidth = 250.0f*w/h;
-        windowHeight = 250.0f;
+        windowWidth = 350.0f*w/h;
+        windowHeight = 350.0f;
     }
 
     gluOrtho2D(0.0f, windowWidth, 0.0f, windowHeight);
@@ -209,9 +276,10 @@ void AlteraTamanhoJanela(GLsizei w, GLsizei h)
 // Programa Principal
 int main(int argc, char** argv)
 {
+    srand(time(NULL));
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB);
     glutInit(&argc, argv);
-    glutInitWindowSize(400,350);
+    glutInitWindowSize(550,500);
     glutInitWindowPosition(10,10);
     glutCreateWindow("Space Invader");
     glutDisplayFunc(Desenha);
