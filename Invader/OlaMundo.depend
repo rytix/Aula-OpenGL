@@ -12,3 +12,11 @@
 	<GL/glu.h>
 	<GL/glut.h>
 
+1460487655 source:c:\users\4276663\desktop\joguinhoterca\invader\main.cpp
+	<windows.h>
+	<math.h>
+	<GL/gl.h>
+	<GL/glu.h>
+	<GL/glut.h>
+	<list>
+
