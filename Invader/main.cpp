@@ -6,7 +6,7 @@
 #include <list>
 #include <time.h>
 #include <cstdlib>
-
+#include <stdio.h>
 using namespace std;
 // *** Definição da nave ***
 //Constantes
@@ -21,7 +21,7 @@ struct Nave{
     int tempo_recarga;
 };
 // *** Definição do tiro ***
-const GLfloat H_TIRO = 15.0f;
+const GLfloat H_TIRO = 10.0f;
 const GLfloat W_TIRO = 5.0f;
 struct Tiro{
     GLfloat x;
@@ -32,7 +32,10 @@ struct Tiro{
 //Constantes
 const GLfloat W_ALIEN = 25.0f;
 const GLfloat H_ALIEN = 15.0f;
-const GLfloat ESPACAMENTO = 0.0f;
+const GLfloat X_STEP_ALIEN = 5.0f;
+const GLfloat Y_STEP_ALIEN = 5.0f;
+const int FRAMES_ENTRE_STEPS_X_ALIEN = 15;
+const int FRAMES_ENTRE_STEPS_Y_ALIEN = 75;
 const int FRAMES_ALIEN = 2;
 const int LINHAS_ALIEN = 8;
 const int COLUNAS_ALIEN = 11;
@@ -71,6 +74,9 @@ struct Alien{
     GLfloat rgb[FRAMES_ALIEN][3];
     int tempo_recarga;
 };
+// *** Definição da Linha Mortal ***
+//Constantes
+const int LINHA_MORTAL_Y = 90;
 // *** FIM DE DEFINIÇÕES ***
 // *** OPENGL E CABEÇALHO ***
 // Largura e altura da janela
@@ -89,9 +95,13 @@ Nave nave;
 list<Alien*> aliens;
 list<Tiro*> tiros;
 bool estado_reiniciar_jogo = true;
+bool estado_fim_jogo = false;
+bool estado_vitoria = false;
+int contagem_frames = 0;
 //Funções do jogo
-void reiniciar_jogo(){
+void iniciar_jogo(){
     if(estado_reiniciar_jogo){
+        contagem_frames = 0;
         estado_reiniciar_jogo = false;
         nave.x = 100;
         nave.y = 20;
@@ -127,6 +137,7 @@ void acao_tiros(){
     }
 }
 void acao_aliens(){
+    //ATIRAR
     list<Alien*>::iterator it = aliens.begin();
     while(it != aliens.end()){
         if(rand() % 100 < 1){ // Chance de atirar
@@ -134,10 +145,76 @@ void acao_aliens(){
         }
         it++;
     }
+    it = aliens.begin();
+    while(it != aliens.end()){
+        if(contagem_frames % FRAMES_ENTRE_STEPS_X_ALIEN == 0){
+            if((contagem_frames / FRAMES_ENTRE_STEPS_Y_ALIEN) % 2 == 0){
+                (*it)->x += X_STEP_ALIEN;
+            }else{
+                (*it)->x -= X_STEP_ALIEN;
+            }
+        }
+        if(contagem_frames % FRAMES_ENTRE_STEPS_Y_ALIEN == 0){
+            (*it)->y -= Y_STEP_ALIEN;
+        }
+        it++;
+    }
 
 }
-void testar_colisao(){
-
+bool colisao_pontos(int x1,int w1,int y1,int h1,int x2, int y2){
+    if(x2 >= x1 && x2 <= x1+w1){
+        if(y2 >= y1 && y2 <= y1+h1){
+            return true;
+        }
+    }
+    return false;
+}
+bool colisao_dentro_quadrado(int x1,int w1,int y1,int h1,int x2,int w2,int y2,int h2){
+    if (x1 < x2 + w2 &&
+   x1 + w1 > x2 &&
+   y1 < y2 + h2 &&
+   h1 + y1 > y2) {
+        return true;
+    }
+    return false;
+}
+void colisao_tiro_e_linha(){
+    list<Tiro*>::iterator it = tiros.begin();
+    while(it != tiros.end()){
+        bool jaIncrementou = false;
+        //Jogador
+        if(!((*it)->tiro_do_jogador)){
+            if(colisao_dentro_quadrado((*it)->x,W_TIRO,(*it)->y,H_TIRO,nave.x,W_NAVE,nave.y,H_NAVE)){
+                estado_fim_jogo = true;
+                it++;
+            }
+        }else{
+            list<Alien*>::iterator it2 = aliens.begin();
+            while(it2 != aliens.end()){
+                if(colisao_dentro_quadrado((*it)->x,W_TIRO,(*it)->y,H_TIRO,(*it2)->x,W_ALIEN,(*it2)->y,H_ALIEN)){
+                    Alien *alien = *it2;
+                    aliens.erase(it2++);
+                    delete alien;
+                    Tiro *tiro = *it;
+                    tiros.erase(it++);
+                    delete tiro;
+                    break;
+                }else{
+                    it2++;
+                }
+            }
+        }
+        if(!jaIncrementou){
+            it++;
+        }
+    }
+    list<Alien*>::iterator it3 = aliens.begin();
+    while(it3 != aliens.end()){
+        if((*it3)->y <= LINHA_MORTAL_Y){
+            estado_fim_jogo = true;
+        }
+        it3++;
+    }
 }
 void atirar(int x, int y, bool jogador_atirando){
     Tiro *tiro;
@@ -149,7 +226,15 @@ void atirar(int x, int y, bool jogador_atirando){
 }
 //*** OpenGL ***
 //Desenhos
+void desenhar_linha_mortal(){
+    glColor3f(1.0f, 0.0f, 0.0f);
+    glBegin(GL_LINES);
+    glVertex2f(0,LINHA_MORTAL_Y);
+    glVertex2f(550,LINHA_MORTAL_Y);
+    glEnd();
+}
 void desenhar_tudo(){
+    desenhar_linha_mortal();
     desenhar_nave(nave);
     list<Alien*>::iterator it = aliens.begin();
     while(it != aliens.end()){
@@ -195,24 +280,33 @@ void desenhar_alien(Alien alien){
 //Definições do OPENGL
 void Timer(int value) //"Main Loop"
 {
-    reiniciar_jogo();
+    iniciar_jogo();
     acao_aliens();
     acao_tiros();
-    //testar_colisao();
+    colisao_tiro_e_linha();
+    contagem_frames++;
     // Redesenha o quadrado com as novas coordenadas
-    glutPostRedisplay();
-    glutTimerFunc(33,Timer, 1);
+    if(estado_fim_jogo)
+        nave.y = -500;
+    if(!estado_fim_jogo){
+        glutPostRedisplay();
+        glutTimerFunc(33,Timer, 1);
+    }
 }
 
 void LerTeclado(unsigned char key, int x, int y){
     switch (key) {
         case 'D':
         case 'd':
-            nave.x += X_STEP_NAVE;
+            if(nave.x < 360){
+                nave.x += X_STEP_NAVE;
+            }
             break;
         case 'A':
         case 'a':
-            nave.x -= X_STEP_NAVE;
+            if(nave.x > 0){
+                nave.x -= X_STEP_NAVE;
+            }
             break;
         case 'W':
         case 'w':
